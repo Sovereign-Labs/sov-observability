@@ -71,8 +71,9 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc:/host/etc:ro
-    # Uncomment this for
-    #      - ${ROLLUP_DATA_DIR:-../examples/demo-rollup/demo_data}:/mnt/rollup:ro
+      # By default, it maps to the existing folder to not throw error and show something in the dashboard.
+      # But callers should specify environment variable to get actual data.
+      - ${ROLLUP_DATA_DIR:-.}:/mnt/rollup:ro
     ports:
       - "127.0.0.1:${TELEGRAF_PORT:-8094}:8094/udp"
       - "127.0.0.1:${TELEGRAF_PORT:-8094}:8094/tcp"

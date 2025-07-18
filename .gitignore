@@ -1,6 +1,16 @@
+# Generated data directories
 influxdb-data/**
 grafana-tempo/data/**
-grafana-alloy/strorage/**
+grafana-alloy/storage/**
+
+# OS files
+.DS_Store
+
+# Environment files (if they contain secrets)
+*.local.env
+
+# Logs
+*.log
 
 ### VisualStudioCode template
 .vscode/*
