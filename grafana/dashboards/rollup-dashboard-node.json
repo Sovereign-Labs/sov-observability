@@ -361,7 +361,7 @@
             "type": "influxdb",
             "uid": "${DS}"
           },
-          "query": "from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r._measurement == \"sov_rollup_runner_counts\" and r._field == \"transactions_c\"\n  )\n  |> filter(fn: (r) => r[\"host\"] == \"${host}\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value / 60.0 }))\n  |> mean()",
+          "query": "from(bucket: \"${bucket}\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) =>\n      r._measurement == \"sov_rollup_runner_counts\" and r._field == \"transactions_c\"\n    )\n    |> filter(fn: (r) => r[\"host\"] == \"${host}\")\n    |> sum()\n    |> map(fn: (r) => ({\n      r with _value: r._value / (float(v: (uint(v: v.timeRangeStop) - uint(v: v.timeRangeStart))) / float(v: uint(v: 1s)))\n    }))",
           "refId": "A"
         }
       ],
@@ -1226,12 +1226,85 @@
       "type": "gauge"
     },
     {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "description": "A rough count of the number of metrics that were dropped",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "dark-red",
+                "value": 10000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 9
+      },
+      "id": 52,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r._measurement == \"sov_rollup_dropped_metrics\" and r._field == \"dropped_metrics\" and r.host == \"${host}\"\n  )\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Dropped Metrics",
+      "type": "stat"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 13
       },
       "id": 18,
       "panels": [],
@@ -1281,6 +1354,7 @@
               "mode": "off"
             }
           },
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1296,13 +1370,52 @@
           },
           "unit": "ms"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fetch_batches_duration_us"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "duration_ms",
+                  "fetch_batches_duration_ms",
+                  "lock_duration_ms"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 14
       },
       "id": 24,
       "options": {
@@ -1334,11 +1447,39 @@
             "type": "influxdb",
             "uid": "${DS}"
           },
-          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_update_state\" \n    and (r._field == \"duration_ms\" or r._field == \"lock_duration_ms\") \n  )\n  |> group(columns: [\"_field\"])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_update_state\" \n    and (r._field == \"duration_ms\" or r._field == \"lock_duration_ms\" or r._field == \"fetch_batches_duration_us\") \n  )\n  |> group(columns: [\"_field\"])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
           "refId": "A"
         }
       ],
       "title": "State replay performance",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "fetch_batches_duration_ms",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "fetch_batches_duration_us"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "fixed": "1000"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "include": [
+                "fetch_batches_duration_us"
+              ],
+              "reducer": "allValues"
+            },
+            "replaceFields": false
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -1444,7 +1585,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 14
       },
       "id": 25,
       "options": {
@@ -1540,7 +1681,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 23
       },
       "id": 26,
       "options": {
@@ -1635,7 +1776,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 23
       },
       "id": 38,
       "options": {
@@ -1664,7 +1805,7 @@
             "type": "influxdb",
             "uid": "${DS}"
           },
-          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"sov_rollup_http_handlers\" and\n    r._field == \"processing_time_us\"\n  )\n  |> drop(columns: [\"host\"])\n  |> rename(columns: {req_method: \"method\", resp_status: \"status\"})\n  |> map(fn: (r) => ({r with _field: \"processing_time\"}))\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.99, column: column))\nelse\n  data",
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"sov_rollup_http_handlers\" and\n    r._field == \"processing_time_us\"\n  )\n  |> drop(columns: [\"host\"])\n  |> rename(columns: {req_method: \"method\", resp_status: \"status\"})\n  |> map(fn: (r) => ({r with _field: \"processing_time\"}))\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.99, column: column))\nelse if agg_func == \"max\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: max)\n  |> drop(columns: [\"_start\", \"_stop\"])\n  |> group(columns: [\"_field\", \"method\", \"path\", \"status\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\nelse\n  data",
           "refId": "A"
         }
       ],
@@ -1736,7 +1877,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 33
       },
       "id": 42,
       "options": {
@@ -1839,7 +1980,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 33
       },
       "id": 21,
       "options": {
@@ -1878,12 +2019,583 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_us"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "num*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "id": 48,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull",
+            "p50",
+            "p99"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "99th %",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_fetch_batches_to_replay\" \n    and (r._field == \"num_batches\" or r._field == \"num_transactions\" or r._field == \"duration_us\") \n  )\n  |> group(columns: [\"_field\"])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "refId": "A"
+        }
+      ],
+      "title": "Fetch Completed Blobs Performance",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Shows the queue depth for the background task, and the amount of time spent blocking. Note that time spent blocking is aggregated per interval - so if the aggregation interval is 10s, this metric shows the total time spent blocking per 10s interval",
+            "axisPlacement": "auto",
+            "axisSoftMax": -3,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocked_for_us"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "id": 49,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull",
+            "p50",
+            "p99"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "99th %",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "agg_func = \"${agg_func}\"\n\nblocking_data = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_executor_event_sending\" \n    and (r._field == \"blocked_for_us\") \n  )\n  |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n  |> group(columns: [\"_field\"])\n\nqueue_depth = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"sov_rollup_preferred_sequencer_executor_event_sending\" and\n    r._field == \"queue_depth\"\n  )\n  |> group(columns: [\"_field\"])\n\ndata = union(tables: [queue_depth, blocking_data])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "refId": "A"
+        }
+      ],
+      "title": "Side Effects Task Backpressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Shows the queue depth for the background task, and the amount of time spent blocking. Note that time spent blocking is aggregated per interval - so if the aggregation interval is 10s, this metric shows the total time spent blocking per 10s interval",
+            "axisPlacement": "auto",
+            "axisSoftMax": -3,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "id": 50,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull",
+            "p50",
+            "p99"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "99th %",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "agg_func = \"${agg_func}\"\n\ncumulative = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_lock\" \n    and (r._field == \"duration_us\") \n  )\n  |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n  |> group(columns: [\"_field\", \"lock_reason\"])\n  |> map(fn: (r) => ({ r with _field: \"total_duration_us\" }))\n\ntotal_across_all = from(bucket: \"${bucket}\")\n    |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n    |> filter(fn: (r) =>\n      r.host == \"${host}\"\n      and r._measurement == \"sov_rollup_preferred_sequencer_lock\"\n      and (r._field == \"duration_us\")\n    )\n    |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n    |> group(columns: [\"_time\", \"_field\"])\n    |> sum(column: \"_value\")\n    |> group(columns: [\"_field\"])\n    |> map(fn: (r) => ({ r with _field: \"sum_of_durations\" }))\n\n\nraw_data = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_lock\" \n    and (r._field == \"duration_us\") \n  )\n  |> group(columns: [\"_field\", \"lock_reason\"])\n\ndata = union(tables: [raw_data, cumulative, total_across_all])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse if agg_func == \"max\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: max)\n  |> drop(columns: [\"_start\", \"_stop\"])\n  |> group(columns: [\"_field\", \"lock_reason\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "refId": "A"
+        }
+      ],
+      "title": "(Under Construction) Lock Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Shows the queue depth for the background task, and the amount of time spent blocking. Note that time spent blocking is aggregated per interval - so if the aggregation interval is 10s, this metric shows the total time spent blocking per 10s interval",
+            "axisPlacement": "auto",
+            "axisSoftMax": -3,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull",
+            "p50",
+            "p99"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "99th %",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "agg_func = \"${agg_func}\"\n\ncumulative = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_executor_event\" \n    and (r._field == \"duration_us\") \n  )\n  |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n  |> group(columns: [\"_field\", \"event_type\"])\n  |> map(fn: (r) => ({ r with _field: \"total_duration_us\" }))\n\ntotal_across_all = from(bucket: \"${bucket}\")\n    |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n    |> filter(fn: (r) =>\n      r.host == \"${host}\"\n      and r._measurement == \"sov_rollup_preferred_sequencer_executor_event\"\n      and (r._field == \"duration_us\")\n    )\n    |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n    |> group(columns: [\"_time\", \"_field\"])\n    |> sum(column: \"_value\")\n    |> group(columns: [\"_field\"])\n    |> map(fn: (r) => ({ r with _field: \"sum_of_durations\" }))\n\n\nraw_data = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_executor_event\" \n    and (r._field == \"duration_us\" or (r._field == \"batch_size\" and r._value != 1)) \n  )\n  |> group(columns: [\"_field\", \"event_type\"])\n\ndata = union(tables: [raw_data, cumulative, total_across_all])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "refId": "A"
+        }
+      ],
+      "title": "(Under Construction) Side Effects Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Shows the queue depth for the background task, and the amount of time spent blocking. Note that time spent blocking is aggregated per interval - so if the aggregation interval is 10s, this metric shows the total time spent blocking per 10s interval",
+            "axisPlacement": "auto",
+            "axisSoftMax": -3,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "close_batch_duration_us size_limit_reached"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 61
+      },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull",
+            "p50",
+            "p99"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "99th %",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r.host == \"${host}\" \n    and r._measurement == \"sov_rollup_preferred_sequencer_batch\" \n  )\n  |> aggregateWindow(every: ${agg_interval}, fn: sum, createEmpty: false)\n  |> group(columns: [\"_field\", \"close_reason\"])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) => tables |> quantile(q: 0.99, column: column))\nelse\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)",
+          "refId": "A"
+        }
+      ],
+      "title": "(Under Construction) Batch Metrics",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 70
       },
       "id": 19,
       "panels": [],
@@ -1955,7 +2667,7 @@
         "h": 10,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 71
       },
       "id": 22,
       "options": {
@@ -2058,7 +2770,7 @@
         "h": 10,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 71
       },
       "id": 37,
       "options": {
@@ -2161,7 +2873,7 @@
         "h": 10,
         "w": 8,
         "x": 16,
-        "y": 40
+        "y": 71
       },
       "id": 36,
       "options": {
@@ -2266,7 +2978,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 81
       },
       "id": 23,
       "options": {
@@ -2367,7 +3079,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 50
+        "y": 81
       },
       "id": 41,
       "options": {
@@ -2473,7 +3185,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 91
       },
       "id": 40,
       "options": {
@@ -2574,7 +3286,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 91
       },
       "id": 29,
       "options": {
@@ -2616,7 +3328,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 101
       },
       "id": 32,
       "panels": [],
@@ -2691,7 +3403,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 71
+        "y": 102
       },
       "id": 33,
       "options": {
@@ -2790,7 +3502,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 71
+        "y": 102
       },
       "id": 20,
       "options": {
@@ -2891,7 +3603,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 112
       },
       "id": 34,
       "options": {
@@ -2994,7 +3706,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 112
       },
       "id": 35,
       "options": {
@@ -3097,7 +3809,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 91
+        "y": 122
       },
       "id": 39,
       "options": {
@@ -3141,7 +3853,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 131
       },
       "id": 28,
       "panels": [],
@@ -3208,7 +3920,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 101
+        "y": 132
       },
       "id": 27,
       "options": {
@@ -3304,27 +4016,13 @@
           },
           "unit": "bytes"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 101
+        "y": 132
       },
       "id": 30,
       "options": {
@@ -3419,7 +4117,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 110
+        "y": 141
       },
       "id": 43,
       "options": {
@@ -3514,27 +4212,13 @@
           },
           "unit": "Bps"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 110
+        "y": 141
       },
       "id": 31,
       "options": {
@@ -3631,7 +4315,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 118
+        "y": 149
       },
       "id": 44,
       "options": {
@@ -3665,6 +4349,312 @@
         }
       ],
       "title": "Sync Distance",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "sishort"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 149
+      },
+      "id": 47,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "p50",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "hide": false,
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"nomt_db_stats\" and r._field != \"avg_page_fetch_time_ns\" and r._field != \"avg_value_fetch_time_ns\"\n  )\n  |> drop(columns: [\"host\"])\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.99, column: column))\nelse\n  data\n",
+          "refId": "A"
+        }
+      ],
+      "title": "NOMT Counts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "description": "The time taken to fetch the block from the Data Availability layer",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 157
+      },
+      "id": 45,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "p50",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "hide": false,
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"pruner\" and r._field == \"time_us\"\n  )\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.99, column: column))\nelse\n  data\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Pruning time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "sishort"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 157
+      },
+      "id": 46,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "p50",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0+security-01",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS}"
+          },
+          "hide": false,
+          "query": "agg_func = \"${agg_func}\"\n\ndata = from(bucket: \"${bucket}\")\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r[\"host\"] == \"${host}\" and\n    r._measurement == \"pruner\" and r._field != \"time_us\"\n  )\n\nif agg_func == \"raw\" then\n  data\nelse if agg_func == \"median\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: median)\nelse if agg_func == \"mean\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: mean)\nelse if agg_func == \"p90\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.90, column: column))\nelse if agg_func == \"p99\" then\n  data |> aggregateWindow(every: ${agg_interval}, fn: (column, tables=<-) =>  tables |> quantile(q: 0.99, column: column))\nelse\n  data\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Pruning counts",
       "type": "timeseries"
     }
   ],
@@ -3761,9 +4751,14 @@
             "selected": true,
             "text": "p99",
             "value": "p99"
+          },
+          {
+            "selected": false,
+            "text": "max",
+            "value": "max"
           }
         ],
-        "query": "raw,mean,median,p90,p99",
+        "query": "raw,mean,median,p90,p99,max",
         "type": "custom"
       },
       {
@@ -3852,5 +4847,5 @@
   "timezone": "browser",
   "title": "Sovereign Rollup Node Dashboard",
   "uid": "sov_rollup_dashboard_influx",
-  "version": 64
+  "version": 89
 }
