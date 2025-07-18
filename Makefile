@@ -8,16 +8,16 @@ DOCKER_COMPOSE := docker compose
 
 ## Start all services
 start:
-	@echo "Starting services..."
+	@echo "Starting observability services..."
 	@$(DOCKER_COMPOSE) up -d --build --force-recreate
-	@echo "Waiting for all observability services to become healthy..."
-	@timeout=300; \
+	@echo "Waiting for all services to become healthy..."
+	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
-		healthy=$$(docker compose ps --format json | jq -r 'select(.Health == "healthy") | .Name' | wc -l); \
-		total=$$(docker compose ps --format json | jq -r '.Name' | wc -l); \
-		starting=$$(docker compose ps --format json | jq -r 'select(.Health == "starting") | .Name' | sort | paste -sd, -); \
-		unhealthy=$$(docker compose ps --format json | jq -r 'select(.Health == "unhealthy") | .Name' | sort | paste -sd, -); \
-		if [ $$healthy -eq $$total ] && [ $$total -gt 0 ]; then \
+		if docker compose ps --format json | jq -e 'select(.Health != "healthy") | .Name' > /dev/null 2>&1; then \
+			printf "\r⏳ Waiting for services... ($$timeout seconds remaining)    "; \
+			sleep 1; \
+			timeout=$$((timeout - 1)); \
+		else \
 			echo ""; \
 			echo "✅ All observability services are healthy!"; \
 			echo ""; \
@@ -28,17 +28,11 @@ start:
 			echo "📊 To monitor your rollup, check out https://sovlabs.notion.site/Tutorial-Getting-started-with-Grafana-Cloud-17e47ef6566b80839fe5c563f5869017?pvs=74"; \
 			exit 0; \
 		fi; \
-		status="⏳ Waiting for services ($$healthy/$$total healthy)"; \
-		if [ -n "$$starting" ]; then status="$$status | Starting: $$starting"; fi; \
-		if [ -n "$$unhealthy" ]; then status="$$status | Unhealthy: $$unhealthy"; fi; \
-		printf "\r$$status                    "; \
-		sleep 1; \
-		timeout=$$((timeout - 1)); \
 	done; \
 	echo ""; \
-	echo "⚠️  Timeout waiting for observability services to become healthy"; \
+	echo "⚠️  Timeout waiting for services to become healthy"; \
 	echo "Check service status with: docker compose ps"; \
-	echo "View logs with: docker compose logs"; \
+	echo "View logs with: make logs"; \
 	exit 1
 
 ## Stop all services
