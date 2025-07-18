@@ -1,19 +1,39 @@
-.PHONY: up down wait-compose-ready restart logs postgres
+.PHONY: up down restart logs ps clean grafana prometheus loki tempo influxdb help
 
 PROJECT_ROOT := $(shell git rev-parse --show-toplevel)
+DOCKER_COMPOSE := docker compose
 
-up:
-	@echo "Starting services"
-	@docker_compose up -d --build --force-recreate
-	@echo "Waiting for services to finish setup"
-	@$(docker_compose) logs -f | awk '/Provisioning finished./ {print;exit}' # exit when encounter this log entry
+# Default target
+.DEFAULT_GOAL := help
 
-down:
-	@echo "Shutting down services"
-	@$(docker_compose) down
-	@echo "Removing generated configs"
+## Start all services
+start:
+	@echo "Starting services..."
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate
 
+## Stop all services
+stop:
+	@echo "Shutting down services..."
+	@$(DOCKER_COMPOSE) down
+
+## Restart all services
 restart: down up
 
+## Show logs for all services
 logs:
-	@$(docker_compose) logs -f
+	@$(DOCKER_COMPOSE) logs -f
+
+## Clean up volumes and networks
+clean:
+	@echo "Cleaning up volumes and networks..."
+	@$(DOCKER_COMPOSE) down -v --remove-orphans
+	rm -rf grafana-alloy/storage/*
+	rm -rf grafana-tempo/data/*
+	rm -rf influxdb-data/engine/*
+	rm -rf influxdb-data/influx*
+
+
+## Show this help message
+help:
+	@echo "Available targets:"
+	@awk '/^##/ {c=$$0} /^[a-z_-]+:/ {gsub("##", "", c); printf "  %-15s %s\n", $$1, c}' $(MAKEFILE_LIST)
