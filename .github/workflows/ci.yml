@@ -17,6 +17,43 @@ jobs:
       
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
+        
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Cache Docker images
+        id: cache-docker-images
+        uses: actions/cache@v3
+        with:
+          path: /tmp/docker-images
+          key: ${{ runner.os }}-docker-images-${{ hashFiles('docker-compose.yml') }}
+          
+      - name: Pull Docker images from cache
+        if: steps.cache-docker-images.outputs.cache-hit == 'true'
+        run: |
+          mkdir -p /tmp/docker-images
+          echo "Loading cached Docker images..."
+          for image_tar in /tmp/docker-images/*.tar; do
+            [ -f "$image_tar" ] && docker load -i "$image_tar" || true
+          done
+          
+      - name: Pull Docker images
+        if: steps.cache-docker-images.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/docker-images
+          echo "Pulling Docker images..."
+          docker compose pull --quiet
+          
+          # Save images to cache
+          echo "Saving Docker images to cache..."
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>" | while read -r image; do
+            echo "Saving $image..."
+            docker save "$image" -o "/tmp/docker-images/$(echo "$image" | tr '/:' '_').tar"
+          done
       
       - name: Start observability stack
         run: |
