@@ -3,6 +3,8 @@ influxdb-data/**
 grafana-tempo/data/**
 grafana-alloy/storage/**
 
+.idea/
+
 # OS files
 .DS_Store
 
