@@ -23,7 +23,7 @@ start:
 			echo ""; \
 			echo "🚀 Observability stack is ready:"; \
 			echo "   - Grafana:     http://localhost:$${GRAFANA_PORT:-3000} (admin/admin123)"; \
-			echo "   - InfluxDB:    http://localhost:$${INFLUX_PORT:-8086}"; \
+			echo "   - InfluxDB:    http://localhost:$${INFLUX_PORT:-8086} (admin/admin123)"; \
 			echo ""; \
 			echo "📊 To monitor your rollup, check out https://sovlabs.notion.site/Tutorial-Getting-started-with-Grafana-Cloud-17e47ef6566b80839fe5c563f5869017?pvs=74"; \
 			exit 0; \

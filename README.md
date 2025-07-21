@@ -83,6 +83,18 @@ To monitor rollup file counts and disk usage:
 - The stack is optimized for local development with minimal resource usage
 - Celestia validator metrics are disabled by default (uncomment in `prometheus.yml` if needed)
 
+## Continuous Integration
+
+The repository includes a GitHub Actions workflow that automatically tests the observability stack:
+
+- Runs on every push to main and pull requests
+- Verifies that `make start` successfully starts all containers
+- Checks that all services reach a healthy state
+- Tests accessibility of key services (Grafana and Prometheus)
+- Cleans up resources after testing
+
+This ensures that the observability stack remains functional as changes are made to the repository.
+
 ## Saving Dashboard Changes
 
 After editing a dashboard in Grafana:
