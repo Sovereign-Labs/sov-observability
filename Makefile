@@ -1,7 +1,7 @@
 .PHONY: up down restart logs ps clean grafana prometheus loki tempo influxdb help
 
 PROJECT_ROOT := $(shell git rev-parse --show-toplevel)
-DOCKER_COMPOSE := docker compose
+DOCKER_COMPOSE := docker-compose
 
 # Default target
 .DEFAULT_GOAL := help
