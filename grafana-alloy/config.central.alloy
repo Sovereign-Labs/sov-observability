@@ -42,7 +42,7 @@ otelcol.processor.attributes "custom_labels" {
 // Tempo
 otelcol.exporter.otlp "sov_tempo" {
   client {
-    endpoint = "{MONITORING_URL}"
+    endpoint = "{MONITORING_URL}:80"
     auth     = otelcol.auth.basic.sov_tempo.handler
     tls {
       insecure = true
