@@ -42,11 +42,8 @@ otelcol.processor.attributes "custom_labels" {
 // Tempo
 otelcol.exporter.otlp "sov_tempo" {
   client {
-    endpoint = "{MONITORING_URL}:80"
+    endpoint = "tempo.sov-obs.xyz:443"
     auth     = otelcol.auth.basic.sov_tempo.handler
-    tls {
-      insecure = true
-    }
   }
 }
 
@@ -78,7 +75,8 @@ loki.process "add_hostname" {
 // Sovereign Loki
 loki.write "sov_loki" {
   endpoint {
-    url = "http://{MONITORING_URL}/loki/api/v1/push"
+    url = "https://loki.sov-obs.xyz/loki/api/v1/push"
+
 
     basic_auth {
       username = "sov-logger"
