@@ -63,6 +63,36 @@ start-alloy-only:
 	echo "View logs with: docker compose logs grafana-alloy"; \
 	exit 1
 
+start-telegraf-only:
+	@echo "Starting Telegraf only..."
+	@$(DOCKER_COMPOSE) up telegraf -d --build --force-recreate
+	@echo "Waiting for Telegraf to become healthy..."
+	@timeout=60; \
+	while [ $$timeout -gt 0 ]; do \
+		status=$$(docker compose ps telegraf --format json | jq -r '.Health // "starting"'); \
+		if [ "$$status" = "healthy" ]; then \
+			echo ""; \
+			echo "✅ Telegraf is healthy!"; \
+			echo ""; \
+			echo "🚀 Telegraf is ready:"; \
+			echo "   - UDP endpoint: localhost:$${TELEGRAF_PORT:-8094}"; \
+			echo "   - TCP endpoint: localhost:$${TELEGRAF_PORT:-8094}"; \
+			echo ""; \
+			exit 0; \
+		else \
+			printf "\r⏳ Waiting for Telegraf... ($$timeout seconds remaining)    "; \
+			sleep 1; \
+			timeout=$$((timeout - 1)); \
+		fi; \
+	done; \
+	echo ""; \
+	echo "⚠️  Timeout waiting for Telegraf to become healthy"; \
+	echo "Check service status with: docker compose ps telegraf"; \
+	echo "View logs with: docker compose logs telegraf"; \
+	exit 1
+
+make start-agents-only: start-telegraf-only start-alloy-only
+
 ## Stop all services
 stop:
 	@echo "Shutting down services..."
