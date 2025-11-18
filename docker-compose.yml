@@ -86,7 +86,7 @@ services:
       timeout: 30s
       retries: 30
   telegraf:
-    image: telegraf:1.27
+    image: telegraf:1.34
     depends_on:
       - influxdb
     volumes:
