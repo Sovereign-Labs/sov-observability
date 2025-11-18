@@ -35,6 +35,64 @@ start:
 	echo "View logs with: make logs"; \
 	exit 1
 
+start-alloy-only:
+	@echo "Starting Grafana Alloy only..."
+	@$(DOCKER_COMPOSE) up grafana-alloy -d --build --force-recreate
+	@echo "Waiting for Grafana Alloy to become healthy..."
+	@timeout=60; \
+	while [ $$timeout -gt 0 ]; do \
+		status=$$(docker compose ps grafana-alloy --format json | jq -r '.Health // "starting"'); \
+		if [ "$$status" = "healthy" ]; then \
+			echo ""; \
+			echo "✅ Grafana Alloy is healthy!"; \
+			echo ""; \
+			echo "🚀 Grafana Alloy is ready:"; \
+			echo "   - gRPC endpoint: localhost:$${ALLOY_GRPC_PORT:-4317}"; \
+			echo "   - HTTP endpoint: localhost:$${ALLOY_HTTP_PORT:-4318}"; \
+			echo ""; \
+			exit 0; \
+		else \
+			printf "\r⏳ Waiting for Grafana Alloy... ($$timeout seconds remaining)    "; \
+			sleep 1; \
+			timeout=$$((timeout - 1)); \
+		fi; \
+	done; \
+	echo ""; \
+	echo "⚠️  Timeout waiting for Grafana Alloy to become healthy"; \
+	echo "Check service status with: docker compose ps grafana-alloy"; \
+	echo "View logs with: docker compose logs grafana-alloy"; \
+	exit 1
+
+start-telegraf-only:
+	@echo "Starting Telegraf only..."
+	@$(DOCKER_COMPOSE) up telegraf -d --build --force-recreate
+	@echo "Waiting for Telegraf to become healthy..."
+	@timeout=60; \
+	while [ $$timeout -gt 0 ]; do \
+		status=$$(docker compose ps telegraf --format json | jq -r '.Health // "starting"'); \
+		if [ "$$status" = "healthy" ]; then \
+			echo ""; \
+			echo "✅ Telegraf is healthy!"; \
+			echo ""; \
+			echo "🚀 Telegraf is ready:"; \
+			echo "   - UDP endpoint: localhost:$${TELEGRAF_PORT:-8094}"; \
+			echo "   - TCP endpoint: localhost:$${TELEGRAF_PORT:-8094}"; \
+			echo ""; \
+			exit 0; \
+		else \
+			printf "\r⏳ Waiting for Telegraf... ($$timeout seconds remaining)    "; \
+			sleep 1; \
+			timeout=$$((timeout - 1)); \
+		fi; \
+	done; \
+	echo ""; \
+	echo "⚠️  Timeout waiting for Telegraf to become healthy"; \
+	echo "Check service status with: docker compose ps telegraf"; \
+	echo "View logs with: docker compose logs telegraf"; \
+	exit 1
+
+make start-agents-only: start-telegraf-only start-alloy-only
+
 ## Stop all services
 stop:
 	@echo "Shutting down services..."
