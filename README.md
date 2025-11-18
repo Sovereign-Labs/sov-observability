@@ -9,7 +9,7 @@ A comprehensive observability stack for monitoring Sovereign rollups in developm
 - **Loki** (v3.3.2) - Log aggregation
 - **Tempo** (v2.6.1) - Distributed tracing
 - **InfluxDB** (v2.7) - Time-series database
-- **Telegraf** (v1.27) - System metrics collection
+- **Telegraf** (v1.34) - System metrics collection
 - **Grafana Alloy** (v1.5.1) - OpenTelemetry collector for logs and traces
 
 ## Quick Start
