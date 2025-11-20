@@ -43,7 +43,7 @@ start-alloy-only:
 	@echo "Waiting for Grafana Alloy to become healthy..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
-		status=$$(docker compose ps grafana-alloy --format json | jq -r '.Health // "starting"'); \
+		status=$$($(DOCKER_COMPOSE) ps grafana-alloy --format json | jq -r '.Health // "starting"'); \
 		if [ "$$status" = "healthy" ]; then \
 			echo ""; \
 			echo "✅ Grafana Alloy is healthy!"; \
