@@ -1,7 +1,9 @@
 .PHONY: up down restart logs ps clean grafana prometheus loki tempo influxdb help
 
 PROJECT_ROOT := $(shell git rev-parse --show-toplevel)
-DOCKER_COMPOSE := docker-compose
+# Detect which docker compose command is available
+# docker-setup-buildx doesn’t install docker-compose v1, and the GitHub Actions runner no longer includes it.
+DOCKER_COMPOSE := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 
 # Default target
 .DEFAULT_GOAL := help
@@ -13,7 +15,7 @@ start:
 	@echo "Waiting for all services to become healthy..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
-		if docker compose ps --format json | jq -e 'select(.Health != "healthy") | .Name' > /dev/null 2>&1; then \
+		if $(DOCKER_COMPOSE) ps --format json | jq -e 'select(.Health != "healthy") | .Name' > /dev/null 2>&1; then \
 			printf "\r⏳ Waiting for services... ($$timeout seconds remaining)    "; \
 			sleep 1; \
 			timeout=$$((timeout - 1)); \
@@ -31,7 +33,7 @@ start:
 	done; \
 	echo ""; \
 	echo "⚠️  Timeout waiting for services to become healthy"; \
-	echo "Check service status with: docker compose ps"; \
+	echo "Check service status with: $DOCKER_COMPOSE ps"; \
 	echo "View logs with: make logs"; \
 	exit 1
 
