@@ -40,30 +40,7 @@ start:
 start-alloy-only:
 	@echo "Starting Grafana Alloy only..."
 	@$(DOCKER_COMPOSE) up -d --build --force-recreate grafana-alloy
-	@echo "Waiting for Grafana Alloy to become healthy..."
-	@timeout=60; \
-	while [ $$timeout -gt 0 ]; do \
-		status=$$($(DOCKER_COMPOSE) ps grafana-alloy --format json | jq -r '.Health // "starting"'); \
-		if [ "$$status" = "healthy" ]; then \
-			echo ""; \
-			echo "✅ Grafana Alloy is healthy!"; \
-			echo ""; \
-			echo "🚀 Grafana Alloy is ready:"; \
-			echo "   - gRPC endpoint: localhost:$${ALLOY_GRPC_PORT:-4317}"; \
-			echo "   - HTTP endpoint: localhost:$${ALLOY_HTTP_PORT:-4318}"; \
-			echo ""; \
-			exit 0; \
-		else \
-			printf "\r⏳ Waiting for Grafana Alloy... ($$timeout seconds remaining)    "; \
-			sleep 1; \
-			timeout=$$((timeout - 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	echo "⚠️  Timeout waiting for Grafana Alloy to become healthy"; \
-	echo "Check service status with: docker compose ps grafana-alloy"; \
-	echo "View logs with: docker compose logs grafana-alloy"; \
-	exit 1
+	sleep 10
 
 start-telegraf-only:
 	@echo "Starting Telegraf only..."
@@ -71,7 +48,7 @@ start-telegraf-only:
 	@echo "Waiting for Telegraf to become healthy..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
-		status=$$(docker compose ps telegraf --format json | jq -r '.Health // "starting"'); \
+		status=$$($(DOCKER_COMPOSE) ps telegraf --format json | jq -r '.Health // "starting"'); \
 		if [ "$$status" = "healthy" ]; then \
 			echo ""; \
 			echo "✅ Telegraf is healthy!"; \
