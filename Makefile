@@ -3,7 +3,8 @@
 PROJECT_ROOT := $(shell git rev-parse --show-toplevel)
 # Detect which docker compose command is available
 # docker-setup-buildx doesn’t install docker-compose v1, and the GitHub Actions runner no longer includes it.
-DOCKER_COMPOSE := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
+# DOCKER_COMPOSE := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
+DOCKER_COMPOSE := $(shell echo "docker compose")
 
 # Default target
 .DEFAULT_GOAL := help
