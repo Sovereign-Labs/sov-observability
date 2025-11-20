@@ -29,56 +29,57 @@ otelcol.processor.attributes "custom_labels" {
   action {
     key = "host"
     action = "insert"
-    value = "sov-dev-box"
+    // Insert host name here:
+    value = "{HOSTNAME}"
   }
   output {
-    traces = [otelcol.exporter.otlp.grafanacloud.input]
+    traces = [otelcol.exporter.otlp.sov_tempo.input]
   }
 }
 
 // Exporters
 
 // Tempo
-otelcol.exporter.otlp "grafanacloud" {
+otelcol.exporter.otlp "sov_tempo" {
   client {
-    endpoint = "tempo-prod-10-prod-eu-west-2.grafana.net:443"
-    auth     = otelcol.auth.basic.grafanacloud.handler
+    endpoint = "{TEMPO_HOST}"
+    auth     = otelcol.auth.basic.sov_tempo.handler
   }
 }
 
-// Tempo: auth
-otelcol.auth.basic "grafanacloud" {
-   username = "1071746"
-   password = "glc_1"
+otelcol.auth.basic "sov_tempo" {
+  username = "{ALLOY_USER}"
+  password = "{ALLOY_PASSWORD}"
 }
+
 
 // OTLP -> Loki
 otelcol.exporter.loki "default" {
   forward_to = [
-    loki.process.add_hostname.receiver,
+   loki.process.add_hostname.receiver,
   ]
 }
 
 loki.process "add_hostname" {
   forward_to = [
-    loki.write.grafanacloud.receiver,
+    loki.write.sov_loki.receiver,
   ]
 
   stage.static_labels {
     values = {
-      host = "sov-dev-box",
+      host = "{HOSTNAME}",
     }
   }
 }
 
-// Loki
-loki.write "grafanacloud" {
+// Sovereign Loki
+loki.write "sov_loki" {
   endpoint {
-    url = "https://logs-prod-012.grafana.net/loki/api/v1/push"
+    url = "https://{LOKI_HOST}/loki/api/v1/push"
 
     basic_auth {
-      username = "1077431"
-      password = "glc_1"
+      username = "{ALLOY_USER}"
+      password = "{ALLOY_PASSWORD}"
     }
   }
 }
