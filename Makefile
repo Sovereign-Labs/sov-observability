@@ -37,7 +37,7 @@ start:
 
 start-alloy-only:
 	@echo "Starting Grafana Alloy only..."
-	@$(DOCKER_COMPOSE) up grafana-alloy -d --build --force-recreate
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate grafana-alloy
 	@echo "Waiting for Grafana Alloy to become healthy..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
@@ -65,7 +65,7 @@ start-alloy-only:
 
 start-telegraf-only:
 	@echo "Starting Telegraf only..."
-	@$(DOCKER_COMPOSE) up telegraf -d --build --force-recreate
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate telegraf
 	@echo "Waiting for Telegraf to become healthy..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
